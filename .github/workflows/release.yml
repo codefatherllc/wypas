@@ -102,10 +102,13 @@ jobs:
             --pattern "wypas-linux" \
             --dir binaries/
 
-      - name: Install dependencies
+      - name: Install appimagetool
         run: |
           sudo apt-get update
           sudo apt-get install -y libfuse2
+          curl -fsSL -o /usr/local/bin/appimagetool \
+            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x /usr/local/bin/appimagetool
 
       - name: Clone wypas-assets
         run: |
@@ -113,48 +116,14 @@ jobs:
             "https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/codefatherllc/wypas-assets.git" \
             wypas-assets
 
-      - name: Build AppImage
+      - name: Package AppImage
         run: |
-          APPDIR="$(mktemp -d)/Wypas.AppDir"
-          mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/wypas" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/256x256/apps"
-
-          cp binaries/wypas-linux "$APPDIR/usr/bin/wypas"
-          chmod +x "$APPDIR/usr/bin/wypas"
-
-          rsync -a --exclude='.git/' --exclude='.github/' --exclude='manifest.json' \
-            --exclude='.gitattributes' --exclude='.gitignore' \
-            wypas-assets/ "$APPDIR/usr/share/wypas/"
-
-          ICON_SRC="wypas-assets/data/images/clienticon.png"
-          if [ -f "$ICON_SRC" ]; then
-            cp "$ICON_SRC" "$APPDIR/usr/share/icons/hicolor/256x256/apps/wypas.png"
-            cp "$ICON_SRC" "$APPDIR/wypas.png"
-          fi
-
-          cat > "$APPDIR/wypas.desktop" <<DESKTOP
-          [Desktop Entry]
-          Type=Application
-          Name=Wypas
-          Exec=wypas
-          Icon=wypas
-          Categories=Game;
-          DESKTOP
-          cp "$APPDIR/wypas.desktop" "$APPDIR/usr/share/applications/"
-
-          cat > "$APPDIR/AppRun" <<'APPRUN'
-          #!/bin/bash
-          HERE="$(dirname "$(readlink -f "$0")")"
-          export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH:-}"
-          exec "${HERE}/usr/bin/wypas" "$@"
-          APPRUN
-          chmod +x "$APPDIR/AppRun"
-
-          curl -fsSL -o /tmp/appimagetool \
-            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
-          chmod +x /tmp/appimagetool
-
-          mkdir -p output
-          ARCH=x86_64 /tmp/appimagetool "$APPDIR" output/wypas-linux.AppImage
+          chmod +x packaging/linux/package.sh
+          ./packaging/linux/package.sh \
+            binaries/wypas-linux \
+            wypas-assets \
+            "${{ steps.tag.outputs.value }}" \
+            output
 
       - name: Upload to release
         run: |
