@@ -1,0 +1,175 @@
+name: Package & Release
+
+on:
+  repository_dispatch:
+    types: [client-release]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.0.0)"
+        required: true
+        type: string
+
+env:
+  GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "value=${{ github.event.client_payload.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download naked binary from release
+        shell: bash
+        run: |
+          mkdir -p binaries
+          gh release download "${{ steps.tag.outputs.value }}" \
+            --repo codefatherllc/wypas \
+            --pattern "wypas-windows.exe" \
+            --dir binaries/
+
+      - name: Clone wypas-assets
+        shell: bash
+        run: |
+          git clone --depth 1 \
+            "https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/codefatherllc/wypas-assets.git" \
+            wypas-assets
+
+      - name: Prepare dist directory
+        shell: bash
+        run: |
+          mkdir -p dist/assets
+          cp binaries/wypas-windows.exe dist/wypas.exe
+          cd wypas-assets
+          find . -mindepth 1 \
+            -not -path './.git/*' -not -path './.github/*' \
+            -not -name '.git' -not -name '.gitattributes' \
+            -not -name '.gitignore' -not -name 'manifest.json' \
+            -print0 | while IFS= read -r -d '' f; do
+            if [ -d "$f" ]; then
+              mkdir -p "../dist/assets/$f"
+            else
+              cp "$f" "../dist/assets/$f"
+            fi
+          done
+
+      - name: Build installer with Inno Setup
+        shell: cmd
+        run: |
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" ^
+            /DAppVersion=${{ steps.tag.outputs.value }} ^
+            packaging\windows\setup.iss
+
+      - name: Upload installer to release
+        shell: bash
+        run: |
+          gh release upload "${{ steps.tag.outputs.value }}" \
+            output/wypas-setup.exe \
+            --repo codefatherllc/wypas \
+            --clobber
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "value=${{ github.event.client_payload.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download naked binary from release
+        run: |
+          mkdir -p binaries
+          gh release download "${{ steps.tag.outputs.value }}" \
+            --repo codefatherllc/wypas \
+            --pattern "wypas-linux" \
+            --dir binaries/
+
+      - name: Clone wypas-assets
+        run: |
+          git clone --depth 1 \
+            "https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/codefatherllc/wypas-assets.git" \
+            wypas-assets
+
+      - name: Package tar.gz
+        run: |
+          chmod +x packaging/linux/package.sh
+          ./packaging/linux/package.sh \
+            binaries/wypas-linux \
+            wypas-assets \
+            "${{ steps.tag.outputs.value }}" \
+            output
+
+      - name: Upload to release
+        run: |
+          gh release upload "${{ steps.tag.outputs.value }}" \
+            output/wypas-linux.tar.gz \
+            --repo codefatherllc/wypas \
+            --clobber
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "value=${{ github.event.client_payload.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download naked binary from release
+        run: |
+          mkdir -p binaries
+          gh release download "${{ steps.tag.outputs.value }}" \
+            --repo codefatherllc/wypas \
+            --pattern "wypas-macos" \
+            --dir binaries/
+
+      - name: Clone wypas-assets
+        run: |
+          git clone --depth 1 \
+            "https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/codefatherllc/wypas-assets.git" \
+            wypas-assets
+
+      - name: Install dependencies
+        run: |
+          brew install dylibbundler
+          brew install --cask xquartz
+
+      - name: Package DMG
+        run: |
+          chmod +x packaging/macos/package-dmg.sh
+          ./packaging/macos/package-dmg.sh \
+            binaries/wypas-macos \
+            wypas-assets \
+            "${{ steps.tag.outputs.value }}" \
+            output
+
+      - name: Upload to release
+        run: |
+          gh release upload "${{ steps.tag.outputs.value }}" \
+            output/wypas-macos.dmg \
+            --repo codefatherllc/wypas \
+            --clobber
