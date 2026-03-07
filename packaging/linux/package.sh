@@ -26,16 +26,16 @@ mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
 cp "$BINARY_PATH" "${APPDIR}/usr/bin/wypas"
 chmod +x "${APPDIR}/usr/bin/wypas"
 
-# Copy assets
+# Copy assets to usr/share/wypas/ (binary searches ../share/wypas/ via discoverWorkDir)
 echo "==> Copying assets"
-mkdir -p "${APPDIR}/usr/bin/assets"
+mkdir -p "${APPDIR}/usr/share/wypas"
 rsync -a \
   --exclude='.git/' \
   --exclude='.github/' \
   --exclude='manifest.json' \
   --exclude='.gitattributes' \
   --exclude='.gitignore' \
-  "${ASSETS_DIR}/" "${APPDIR}/usr/bin/assets/"
+  "${ASSETS_DIR}/" "${APPDIR}/usr/share/wypas/"
 
 # Icon — use icon.png from assets if available, otherwise generate from .ico
 ICON_SRC="${ASSETS_DIR}/data/images/clienticon.png"
