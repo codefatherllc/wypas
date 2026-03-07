@@ -6,15 +6,17 @@
 AppName=Wypas
 AppVersion={#AppVersion}
 AppPublisher=Wypas
-DefaultDirName={autopf}\Wypas
+DefaultDirName={localappdata}\Wypas
 DefaultGroupName=Wypas
 OutputDir=..\..\output
 OutputBaseFilename=wypas-setup
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
-SetupIconFile=
+SetupIconFile=packaging\windows\favicon.ico
 UninstallDisplayIcon={app}\wypas.exe
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
 
 [Files]
 Source: "..\..\dist\wypas.exe"; DestDir: "{app}"; Flags: ignoreversion
