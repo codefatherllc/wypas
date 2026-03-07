@@ -102,13 +102,18 @@ jobs:
             --pattern "wypas-linux" \
             --dir binaries/
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+
       - name: Clone wypas-assets
         run: |
           git clone --depth 1 \
             "https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/codefatherllc/wypas-assets.git" \
             wypas-assets
 
-      - name: Package tar.gz
+      - name: Package AppImage
         run: |
           chmod +x packaging/linux/package.sh
           ./packaging/linux/package.sh \
@@ -120,7 +125,7 @@ jobs:
       - name: Upload to release
         run: |
           gh release upload "${{ steps.tag.outputs.value }}" \
-            output/wypas-linux.tar.gz \
+            output/wypas-linux.AppImage \
             --repo codefatherllc/wypas \
             --clobber
 
