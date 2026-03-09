@@ -162,9 +162,7 @@ jobs:
             wypas-assets
 
       - name: Install dependencies
-        run: |
-          brew install dylibbundler
-          brew install --cask xquartz
+        run: brew install dylibbundler
 
       - name: Package DMG
         run: |
