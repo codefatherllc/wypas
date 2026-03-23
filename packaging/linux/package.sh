@@ -1,24 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: package.sh <binary_path> <assets_dir> <tag> <output_dir>
+# Usage: package.sh <binary_path> <tag> <output_dir>
+# Legacy: package.sh <binary_path> <assets_dir> <tag> <output_dir>
+#   (assets_dir is ignored — assets are fetched by the updater at first launch)
 
-if [ $# -ne 4 ]; then
-  echo "Usage: $0 <binary_path> <assets_dir> <tag> <output_dir>"
+if [ $# -eq 4 ]; then
+  # Legacy invocation with assets_dir — ignore it
+  BINARY_PATH="$1"
+  TAG="$3"
+  OUTPUT_DIR="$4"
+elif [ $# -eq 3 ]; then
+  BINARY_PATH="$1"
+  TAG="$2"
+  OUTPUT_DIR="$3"
+else
+  echo "Usage: $0 <binary_path> <tag> <output_dir>"
   exit 1
 fi
 
-BINARY_PATH="$1"
-ASSETS_DIR="$2"
-TAG="$3"
-OUTPUT_DIR="$4"
-
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APPDIR="$(mktemp -d)/Wypas.AppDir"
 trap 'rm -rf "$(dirname "$APPDIR")"' EXIT
 
 echo "==> Creating AppDir structure"
 mkdir -p "${APPDIR}/usr/bin"
-mkdir -p "${APPDIR}/usr/share/wypas"
 mkdir -p "${APPDIR}/usr/share/applications"
 mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
 
@@ -26,18 +32,8 @@ mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
 cp "$BINARY_PATH" "${APPDIR}/usr/bin/wypas"
 chmod +x "${APPDIR}/usr/bin/wypas"
 
-# Copy assets to usr/share/wypas/ (binary searches ../share/wypas/ via discoverWorkDir)
-echo "==> Copying assets"
-rsync -a \
-  --exclude='.git/' \
-  --exclude='.github/' \
-  --exclude='manifest.json' \
-  --exclude='.gitattributes' \
-  --exclude='.gitignore' \
-  "${ASSETS_DIR}/" "${APPDIR}/usr/share/wypas/"
-
-# Icon
-ICON_SRC="${ASSETS_DIR}/data/images/clienticon.png"
+# Icon from packaging directory
+ICON_SRC="${SCRIPT_DIR}/../icon.png"
 if [ -f "$ICON_SRC" ]; then
   cp "$ICON_SRC" "${APPDIR}/usr/share/icons/hicolor/256x256/apps/wypas.png"
   cp "$ICON_SRC" "${APPDIR}/wypas.png"

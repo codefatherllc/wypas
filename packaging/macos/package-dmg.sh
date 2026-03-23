@@ -1,21 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: package-dmg.sh <binary_path> <assets_dir> <tag> <output_dir>
+# Usage: package-dmg.sh <binary_path> <tag> <output_dir>
+# Legacy: package-dmg.sh <binary_path> <assets_dir> <tag> <output_dir>
+#   (assets_dir is ignored — assets are fetched by the updater at first launch)
 
-if [ $# -ne 4 ]; then
-  echo "Usage: $0 <binary_path> <assets_dir> <tag> <output_dir>"
+if [ $# -eq 4 ]; then
+  # Legacy invocation with assets_dir — ignore it
+  BINARY_PATH="$1"
+  TAG="$3"
+  OUTPUT_DIR="$4"
+elif [ $# -eq 3 ]; then
+  BINARY_PATH="$1"
+  TAG="$2"
+  OUTPUT_DIR="$3"
+else
+  echo "Usage: $0 <binary_path> <tag> <output_dir>"
   exit 1
 fi
-
-BINARY_PATH="$1"
-ASSETS_DIR="$2"
-TAG="$3"
-OUTPUT_DIR="$4"
 
 APP_NAME="Wypas"
 APP_BUNDLE="${APP_NAME}.app"
 STAGING_DIR="$(mktemp -d)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 trap 'rm -rf "$STAGING_DIR"' EXIT
 
@@ -27,16 +34,6 @@ mkdir -p "${STAGING_DIR}/${APP_BUNDLE}/Contents/libs"
 # Copy binary
 cp "$BINARY_PATH" "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
 chmod +x "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
-
-# Copy assets (excluding repo metadata)
-echo "==> Copying assets"
-rsync -a \
-  --exclude='.git/' \
-  --exclude='.github/' \
-  --exclude='manifest.json' \
-  --exclude='.gitattributes' \
-  --exclude='.gitignore' \
-  "${ASSETS_DIR}/" "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/assets/"
 
 # Generate Info.plist
 SHORT_VERSION="${TAG#v}"  # strip leading 'v'
@@ -67,8 +64,8 @@ cat > "${STAGING_DIR}/${APP_BUNDLE}/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# Generate .icns from icon.png if it exists
-ICON_PNG="${ASSETS_DIR}/data/images/icon.png"
+# Generate .icns from icon.png shipped in packaging/
+ICON_PNG="${SCRIPT_DIR}/../icon.png"
 if [ -f "$ICON_PNG" ]; then
   echo "==> Generating AppIcon.icns from icon.png"
   ICONSET_DIR="${STAGING_DIR}/AppIcon.iconset"

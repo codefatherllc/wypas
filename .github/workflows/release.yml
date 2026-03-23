@@ -33,36 +33,12 @@ jobs:
       - name: Download naked binary from release
         shell: bash
         run: |
-          mkdir -p binaries
+          mkdir -p dist
           gh release download "${{ steps.tag.outputs.value }}" \
             --repo codefatherllc/wypas \
             --pattern "wypas-windows.exe" \
-            --dir binaries/
-
-      - name: Clone wypas-assets
-        shell: bash
-        run: |
-          git clone --depth 1 \
-            "https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/codefatherllc/wypas-assets.git" \
-            wypas-assets
-
-      - name: Prepare dist directory
-        shell: bash
-        run: |
-          mkdir -p dist/assets
-          cp binaries/wypas-windows.exe dist/wypas.exe
-          cd wypas-assets
-          find . -mindepth 1 \
-            -not -path './.git/*' -not -path './.github/*' \
-            -not -name '.git' -not -name '.gitattributes' \
-            -not -name '.gitignore' -not -name 'manifest.json' \
-            -print0 | while IFS= read -r -d '' f; do
-            if [ -d "$f" ]; then
-              mkdir -p "../dist/assets/$f"
-            else
-              cp "$f" "../dist/assets/$f"
-            fi
-          done
+            --dir dist/
+          mv dist/wypas-windows.exe dist/wypas.exe
 
       - name: Build installer with Inno Setup
         shell: cmd
@@ -110,18 +86,11 @@ jobs:
             "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x /usr/local/bin/appimagetool
 
-      - name: Clone wypas-assets
-        run: |
-          git clone --depth 1 \
-            "https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/codefatherllc/wypas-assets.git" \
-            wypas-assets
-
       - name: Package AppImage
         run: |
           chmod +x packaging/linux/package.sh
           ./packaging/linux/package.sh \
             binaries/wypas-linux \
-            wypas-assets \
             "${{ steps.tag.outputs.value }}" \
             output
 
@@ -155,12 +124,6 @@ jobs:
             --pattern "wypas-macos" \
             --dir binaries/
 
-      - name: Clone wypas-assets
-        run: |
-          git clone --depth 1 \
-            "https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/codefatherllc/wypas-assets.git" \
-            wypas-assets
-
       - name: Install dependencies
         run: brew install dylibbundler
 
@@ -169,7 +132,6 @@ jobs:
           chmod +x packaging/macos/package-dmg.sh
           ./packaging/macos/package-dmg.sh \
             binaries/wypas-macos \
-            wypas-assets \
             "${{ steps.tag.outputs.value }}" \
             output
 
