@@ -149,6 +149,6 @@ jobs:
       - name: Upload to release
         run: |
           gh release upload "${{ steps.tag.outputs.value }}" \
-            output/wypas-macos.dmg \
+            output/wypas-setup.dmg \
             --repo codefatherllc/wypas \
             --clobber

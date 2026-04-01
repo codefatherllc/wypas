@@ -99,7 +99,7 @@ dylibbundler \
 # Create DMG
 echo "==> Creating DMG"
 mkdir -p "$OUTPUT_DIR"
-DMG_PATH="${OUTPUT_DIR}/wypas-macos.dmg"
+DMG_PATH="${OUTPUT_DIR}/wypas-setup.dmg"
 
 hdiutil create \
   -volname "$APP_NAME" \
