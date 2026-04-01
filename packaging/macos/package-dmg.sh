@@ -96,6 +96,9 @@ dylibbundler \
   -p @executable_path/../libs/ \
   2>&1 || echo "==> dylibbundler completed (some libs may be static)"
 
+# Add Applications symlink for drag-and-drop install
+ln -s /Applications "${STAGING_DIR}/Applications"
+
 # Create DMG
 echo "==> Creating DMG"
 mkdir -p "$OUTPUT_DIR"
