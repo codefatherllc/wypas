@@ -136,7 +136,7 @@ jobs:
       - name: Install dependencies
         run: |
           brew install dylibbundler luajit physfs libzip openssl@3 \
-            glfw openal-soft libogg libvorbis boost
+            glfw openal-soft libogg libvorbis boost zlib bzip2
 
       - name: Package DMG
         run: |
