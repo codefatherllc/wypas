@@ -71,14 +71,21 @@ jobs:
           fi
 
       - name: Download naked binary from release
+        id: download
         run: |
           mkdir -p binaries
-          gh release download "${{ steps.tag.outputs.value }}" \
+          if gh release download "${{ steps.tag.outputs.value }}" \
             --repo codefatherllc/wypas \
             --pattern "wypas-linux" \
-            --dir binaries/
+            --dir binaries/ 2>/dev/null; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::wypas-linux binary not found on release, skipping Linux packaging"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install appimagetool
+        if: steps.download.outputs.found == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y libfuse2
@@ -87,6 +94,7 @@ jobs:
           chmod +x /usr/local/bin/appimagetool
 
       - name: Package AppImage
+        if: steps.download.outputs.found == 'true'
         run: |
           chmod +x packaging/linux/package.sh
           ./packaging/linux/package.sh \
@@ -95,6 +103,7 @@ jobs:
             output
 
       - name: Upload to release
+        if: steps.download.outputs.found == 'true'
         run: |
           gh release upload "${{ steps.tag.outputs.value }}" \
             output/wypas-linux.AppImage \
@@ -125,7 +134,9 @@ jobs:
             --dir binaries/
 
       - name: Install dependencies
-        run: brew install dylibbundler
+        run: |
+          brew install dylibbundler luajit physfs libzip openssl@3 \
+            glfw openal-soft libogg libvorbis boost
 
       - name: Package DMG
         run: |
