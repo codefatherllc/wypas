@@ -12,13 +12,13 @@ on:
 
 env:
   GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+  UPDATER_MODULES: "updater client_locales client_styles client_background"
 
 jobs:
   windows:
     runs-on: windows-2022
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Resolve tag
         id: tag
@@ -58,8 +58,7 @@ jobs:
   linux:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Resolve tag
         id: tag
@@ -80,15 +79,23 @@ jobs:
             --dir binaries/ 2>/dev/null; then
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::wypas-linux binary not found on release, skipping Linux packaging"
+            echo "::warning::wypas-linux not found, skipping Linux packaging"
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Clone updater modules
+        if: steps.download.outputs.found == 'true'
+        run: |
+          git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git /tmp/assets
+          mkdir -p modules
+          for mod in $UPDATER_MODULES; do
+            cp -r /tmp/assets/modules/$mod modules/
+          done
 
       - name: Install appimagetool
         if: steps.download.outputs.found == 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libfuse2
+          sudo apt-get update && sudo apt-get install -y libfuse2
           curl -fsSL -o /usr/local/bin/appimagetool \
             "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x /usr/local/bin/appimagetool
@@ -100,21 +107,21 @@ jobs:
           ./packaging/linux/package.sh \
             binaries/wypas-linux \
             "${{ steps.tag.outputs.value }}" \
-            output
+            output \
+            modules
 
       - name: Upload to release
         if: steps.download.outputs.found == 'true'
         run: |
           gh release upload "${{ steps.tag.outputs.value }}" \
-            output/wypas-linux.AppImage \
+            output/wypas.AppImage \
             --repo codefatherllc/wypas \
             --clobber
 
   macos:
     runs-on: macos-14
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Resolve tag
         id: tag
@@ -133,6 +140,14 @@ jobs:
             --pattern "wypas-macos" \
             --dir binaries/
 
+      - name: Clone updater modules
+        run: |
+          git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git /tmp/assets
+          mkdir -p modules
+          for mod in $UPDATER_MODULES; do
+            cp -r /tmp/assets/modules/$mod modules/
+          done
+
       - name: Install dependencies
         run: |
           brew install dylibbundler luajit physfs libzip openssl@3 \
@@ -144,7 +159,8 @@ jobs:
           ./packaging/macos/package-dmg.sh \
             binaries/wypas-macos \
             "${{ steps.tag.outputs.value }}" \
-            output
+            output \
+            modules
 
       - name: Upload to release
         run: |

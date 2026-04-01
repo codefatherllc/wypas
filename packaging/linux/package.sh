@@ -1,23 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: package.sh <binary_path> <tag> <output_dir>
-# Legacy: package.sh <binary_path> <assets_dir> <tag> <output_dir>
-#   (assets_dir is ignored — assets are fetched by the updater at first launch)
+# Usage: package.sh <binary_path> <tag> <output_dir> [modules_dir]
 
-if [ $# -eq 4 ]; then
-  # Legacy invocation with assets_dir — ignore it
-  BINARY_PATH="$1"
-  TAG="$3"
-  OUTPUT_DIR="$4"
-elif [ $# -eq 3 ]; then
-  BINARY_PATH="$1"
-  TAG="$2"
-  OUTPUT_DIR="$3"
-else
-  echo "Usage: $0 <binary_path> <tag> <output_dir>"
-  exit 1
-fi
+BINARY_PATH="$1"
+TAG="$2"
+OUTPUT_DIR="$3"
+MODULES_DIR="${4:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APPDIR="$(mktemp -d)/Wypas.AppDir"
@@ -28,11 +17,17 @@ mkdir -p "${APPDIR}/usr/bin"
 mkdir -p "${APPDIR}/usr/share/applications"
 mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
 
-# Copy binary
 cp "$BINARY_PATH" "${APPDIR}/usr/bin/wypas"
 chmod +x "${APPDIR}/usr/bin/wypas"
 
-# Icon from packaging directory
+# Bundle updater modules
+if [ -n "$MODULES_DIR" ] && [ -d "$MODULES_DIR" ]; then
+  echo "==> Bundling modules from $MODULES_DIR"
+  mkdir -p "${APPDIR}/usr/bin/modules"
+  cp -r "$MODULES_DIR"/* "${APPDIR}/usr/bin/modules/"
+fi
+
+# Icon
 ICON_SRC="${SCRIPT_DIR}/../icon.png"
 if [ -f "$ICON_SRC" ]; then
   cp "$ICON_SRC" "${APPDIR}/usr/share/icons/hicolor/256x256/apps/wypas.png"
@@ -59,9 +54,8 @@ exec "${HERE}/usr/bin/wypas" "$@"
 APPRUN
 chmod +x "${APPDIR}/AppRun"
 
-# Build AppImage
 echo "==> Creating AppImage"
 mkdir -p "$OUTPUT_DIR"
-ARCH=x86_64 appimagetool "$APPDIR" "${OUTPUT_DIR}/wypas-linux.AppImage"
+ARCH=x86_64 appimagetool "$APPDIR" "${OUTPUT_DIR}/wypas.AppImage"
 
-echo "==> Done: ${OUTPUT_DIR}/wypas-linux.AppImage"
+echo "==> Done: ${OUTPUT_DIR}/wypas.AppImage"
