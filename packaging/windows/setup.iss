@@ -30,8 +30,8 @@ Filename: "{app}\wypas.exe"; Description: "Launch Wypas"; Flags: nowait postinst
 
 [Code]
 const
-  ManifestURL = 'https://wypas.pl/assets/manifest.json';
-  AssetsBaseURL = 'https://wypas.pl/assets/';
+  ManifestURL = 'https://wypas.eu/assets/manifest.json';
+  AssetsBaseURL = 'https://wypas.eu/assets/';
 
 var
   DownloadPage: TOutputProgressWizardPage;
