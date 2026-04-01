@@ -55,25 +55,12 @@ begin
 end;
 
 function DownloadFile(const URL, DestPath: String): Boolean;
-var
-  WinHttpReq: Variant;
-  Stream: Variant;
 begin
   Result := False;
   try
-    WinHttpReq := CreateOleObject('WinHttp.WinHttpRequest.5.1');
-    WinHttpReq.Open('GET', URL, False);
-    WinHttpReq.Send('');
-    if WinHttpReq.Status = 200 then
-    begin
-      Stream := CreateOleObject('ADODB.Stream');
-      Stream.Type := 1; // binary
-      Stream.Open;
-      Stream.Write(WinHttpReq.ResponseBody);
-      Stream.SaveToFile(DestPath, 2); // overwrite
-      Stream.Close;
-      Result := True;
-    end;
+    DownloadTemporaryFile(URL, ExtractFileName(DestPath), '', nil);
+    FileCopy(ExpandConstant('{tmp}') + '\' + ExtractFileName(DestPath), DestPath, False);
+    Result := True;
   except
   end;
 end;
