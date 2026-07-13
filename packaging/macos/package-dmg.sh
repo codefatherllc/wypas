@@ -13,9 +13,12 @@ PACK_DIR="${4:-}"
 APP_NAME="Wypas"
 APP_BUNDLE="${APP_NAME}.app"
 STAGING_DIR="$(mktemp -d)"
+# plaintext init.lua for the seed-gate check — kept OUTSIDE the staging dir so it can
+# never be swept into the DMG (the DMG is built from the whole STAGING_DIR).
+PLAIN_INIT="$(mktemp)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-trap 'rm -rf "$STAGING_DIR"' EXIT
+trap 'rm -rf "$STAGING_DIR" "$PLAIN_INIT"' EXIT
 
 echo "==> Creating .app bundle structure"
 mkdir -p "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS"
@@ -66,7 +69,7 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
   # Keep the pre-encryption plaintext so the seed check below can recover the seed the
   # binary used (init.lua is encrypted raw — never bytecode-compiled — so its bytes are
   # exactly what the ENC3 adler word was computed over).
-  cp "$ASSETS_OUT/init.lua" "${STAGING_DIR}/init.lua.plain"
+  cp "$ASSETS_OUT/init.lua" "$PLAIN_INIT"
 
   # Encrypt the staged pack in place so the .app ships no readable game assets.
   # The macOS release binary is built WITH_ENCRYPTION and carries the seed, so the
@@ -134,7 +137,7 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
   # the expected seed is supplied; skipped for local/dev builds. No secret is printed.
   if [ -n "${ASSET_ENCRYPTION_SEED:-}" ] && command -v python3 >/dev/null 2>&1; then
     if ! ASSET_ENCRYPTION_SEED="$ASSET_ENCRYPTION_SEED" python3 - \
-        "$ASSETS_OUT/init.lua" "${STAGING_DIR}/init.lua.plain" <<'PY'
+        "$ASSETS_OUT/init.lua" "$PLAIN_INIT" <<'PY'
 import os, sys, zlib, struct
 enc, plain = sys.argv[1], sys.argv[2]
 with open(enc, 'rb') as f: head = f.read(24)
