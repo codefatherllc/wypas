@@ -156,8 +156,12 @@ jobs:
       # (updater ON), then encrypts the staged Contents/Resources in place using
       # this same wypas-macos binary as the encrypt tool. That binary MUST be built
       # WITH_ENCRYPTION (the seed is compiled in) or the script fails the build via
-      # its ENC3 tripwire rather than shipping a plaintext .app.
+      # its ENC3 tripwire rather than shipping a plaintext .app. ASSET_ENCRYPTION_SEED
+      # lets the script recover and verify the seed the binary used (rejects a lenient
+      # seed-0 or wrong-seed binary); it is masked in logs and never printed.
       - name: Package DMG (render prod init.lua + encrypt pack)
+        env:
+          ASSET_ENCRYPTION_SEED: ${{ secrets.ASSET_ENCRYPTION_SEED }}
         run: |
           chmod +x packaging/macos/package-dmg.sh
           ./packaging/macos/package-dmg.sh \

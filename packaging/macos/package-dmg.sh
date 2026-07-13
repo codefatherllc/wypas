@@ -63,6 +63,10 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
     exit 1
   fi
   echo "==> Rendered init.lua (updater -> ${WYPAS_BASE_URL}/api/updater)"
+  # Keep the pre-encryption plaintext so the seed check below can recover the seed the
+  # binary used (init.lua is encrypted raw — never bytecode-compiled — so its bytes are
+  # exactly what the ENC3 adler word was computed over).
+  cp "$ASSETS_OUT/init.lua" "${STAGING_DIR}/init.lua.plain"
 
   # Encrypt the staged pack in place so the .app ships no readable game assets.
   # The macOS release binary is built WITH_ENCRYPTION and carries the seed, so the
@@ -121,6 +125,38 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
   enc_count=$(find "$ASSETS_OUT/data" "$ASSETS_OUT/modules" "$ASSETS_OUT/mods" "$ASSETS_OUT/layouts" \
     -type f 2>/dev/null -exec sh -c '[ "$(head -c 4 "$1" 2>/dev/null)" = ENC3 ]' _ {} \; -print | wc -l | tr -d ' ')
   echo "==> Pack encrypted (init.lua + Tibia.dat/.spr ENC3; ${enc_count} files under data/modules/mods/layouts ENC3)"
+
+  # Seed verification (defense-in-depth at the distribution boundary). The ENC3 adler
+  # word (bytes 20-23, LE) is adler32(plaintext) XOR the compiled seed. We know
+  # init.lua's plaintext, so recover the seed the binary actually used: a seed-0 pack
+  # decrypts on ANY client (zero IP protection — plaintext-equivalent for the deliverable),
+  # and a wrong seed won't match the prod-served pack. Reject both. Only runs in CI where
+  # the expected seed is supplied; skipped for local/dev builds. No secret is printed.
+  if [ -n "${ASSET_ENCRYPTION_SEED:-}" ] && command -v python3 >/dev/null 2>&1; then
+    if ! ASSET_ENCRYPTION_SEED="$ASSET_ENCRYPTION_SEED" python3 - \
+        "$ASSETS_OUT/init.lua" "${STAGING_DIR}/init.lua.plain" <<'PY'
+import os, sys, zlib, struct
+enc, plain = sys.argv[1], sys.argv[2]
+with open(enc, 'rb') as f: head = f.read(24)
+with open(plain, 'rb') as f: pt = f.read()
+if len(head) < 24 or head[:4] != b'ENC3':
+    sys.stderr.write("ERROR: init.lua has no ENC3 header for seed check\n"); sys.exit(1)
+recovered = struct.unpack('<I', head[20:24])[0] ^ (zlib.adler32(pt) & 0xffffffff)
+expected = zlib.adler32(os.environ['ASSET_ENCRYPTION_SEED'].encode()) & 0xffffffff
+if recovered == 0:
+    sys.stderr.write("ERROR: pack encrypted with seed 0 (lenient) — universally decryptable, "
+                     "no protection. Build wypas-macos with -DASSET_ENCRYPTION_SEED.\n"); sys.exit(1)
+if recovered != expected:
+    sys.stderr.write("ERROR: pack seed %#010x != expected %#010x — binary built with the wrong "
+                     "ASSET_ENCRYPTION_SEED.\n" % (recovered, expected)); sys.exit(1)
+print("==> Seed verified (binary carries the expected ASSET_ENCRYPTION_SEED)")
+PY
+    then
+      exit 1
+    fi
+  else
+    echo "==> Seed check skipped (ASSET_ENCRYPTION_SEED unset or python3 missing)"
+  fi
 fi
 
 # Info.plist
