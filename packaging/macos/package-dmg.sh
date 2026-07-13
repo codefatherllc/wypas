@@ -43,13 +43,21 @@ chmod +x "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
 # the bundle's Resources dir for a macOS .app, and the client's work-dir search
 # checks baseDir for init.lua, so the app runs self-contained.
 if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
-  echo "==> Bundling pack from $PACK_DIR"
+  echo "==> Bundling THIN bootstrap from $PACK_DIR"
   ASSETS_OUT="${STAGING_DIR}/${APP_BUNDLE}/Contents/Resources"
   mkdir -p "$ASSETS_OUT"
-  # exclude repo/dev cruft and the template; init.lua is rendered below, not copied
+  # Thin installer: bundle ONLY the bootstrap the updater window needs to run —
+  # corelib + updater + its deps (client_locales/styles/background) + data/ (fonts,
+  # styles, images the UI renders with). init.lua is rendered below. EVERYTHING else
+  # (game/client modules, Tibia.dat/.spr, layouts/, mods/) syncs via the updater on
+  # first launch — one auto-restart, then login. Validated: 6.6M bundle → full sync.
   ( cd "$PACK_DIR" && tar --exclude='.git' --exclude='.github' --exclude='.claude' \
-      --exclude='*.md' --exclude='LICENSE' --exclude='init.lua.tmpl' --exclude='init.lua' \
-      --exclude='.gitattributes' --exclude='.gitignore' -cf - . ) | tar -xf - -C "$ASSETS_OUT"
+      --exclude='*.md' --exclude='LICENSE' \
+      --exclude='.gitattributes' --exclude='.gitignore' -cf - \
+      data \
+      modules/corelib modules/updater \
+      modules/client_locales modules/client_styles modules/client_background \
+    ) | tar -xf - -C "$ASSETS_OUT"
 
   # Render init.lua from the template with prod values so the auto-updater is ON.
   # Mirrors wypas-proxy/Makefile's prod render; kept here so the offline .app bundle
