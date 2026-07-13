@@ -66,11 +66,13 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
 
   # Encrypt the staged pack in place so the .app ships no readable game assets.
   # The macOS release binary is built WITH_ENCRYPTION and carries the seed, so the
-  # same client decrypts transparently at runtime; exempt files (.otml, ...) are
-  # left plaintext by the tool. Run from a neutral CWD and pass the dir as the arg
-  # (the tool's documented contract) — this is fail-safe: a wrong/old binary that
-  # lacks --encrypt support cannot silently mis-encrypt this dir, it just leaves it
-  # plaintext, which the ENC3 tripwire below catches.
+  # same client decrypts transparently at runtime. The tool ENC3-wraps everything it
+  # walks ({data,modules,mods,layouts} + init.lua + root Tibia.dat/.spr); the client's
+  # exempt extensions are a decrypt-side "plaintext is allowed" list, not an
+  # encrypt-side skip. Run from a neutral CWD and pass the dir as the arg (the tool's
+  # documented contract) — this is fail-safe: a wrong/old binary that lacks --encrypt
+  # support cannot silently mis-encrypt this dir, it just leaves it plaintext, which
+  # the ENC3 tripwire below catches.
   WYPAS_BIN="${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
   echo "==> Encrypting pack in place: $WYPAS_BIN --encrypt $ASSETS_OUT"
   "$WYPAS_BIN" --encrypt "$ASSETS_OUT" &
@@ -92,28 +94,33 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
   ENC_RC=0
   wait "$ENC_PID" 2>/dev/null || ENC_RC=$?
 
-  # Tripwire: init.lua MUST be ENC3 after --encrypt. This is the reliable proof the
-  # tool ran with its compiled-in seed on this dir; a binary lacking WITH_ENCRYPTION
-  # (or a wrong dir/seed) leaves it plaintext. Fail loudly rather than ship plaintext.
-  if [ "$(head -c 4 "$ASSETS_OUT/init.lua" 2>/dev/null)" != "ENC3" ]; then
-    echo "ERROR: init.lua is not ENC3-encrypted after --encrypt (rc=$ENC_RC)." >&2
-    echo "       The macOS binary must be built WITH_ENCRYPTION with ASSET_ENCRYPTION_SEED set." >&2
+  # Verify on the OUTPUT (enc-engine's recommended ground-truth check), independent
+  # of how the binary was built: (1) the tool reported success, and (2) the headline
+  # assets are ENC3. init.lua proves the tool ran with its compiled-in seed on this
+  # dir; Tibia.dat/.spr are the sprites/dat the deliverable requires unreadable (the
+  # tool covers pack-root Tibia.* as of the encryption integration). Fail loudly
+  # rather than ship a plaintext .app.
+  if [ "$ENC_RC" -ne 0 ]; then
+    echo "ERROR: --encrypt exited non-zero (rc=$ENC_RC)." >&2
+    exit 1
+  fi
+  enc_fail=0
+  for rel in init.lua Tibia.dat Tibia.spr; do
+    f="$ASSETS_OUT/$rel"
+    [ -f "$f" ] || continue
+    if [ "$(head -c 4 "$f" 2>/dev/null)" != "ENC3" ]; then
+      echo "ERROR: $rel is not ENC3-encrypted after --encrypt." >&2
+      enc_fail=1
+    fi
+  done
+  if [ "$enc_fail" -ne 0 ]; then
+    echo "       The macOS binary must be built WITH_ENCRYPTION (from the integration that" >&2
+    echo "       encrypts pack-root Tibia.dat/.spr) with ASSET_ENCRYPTION_SEED set." >&2
     exit 1
   fi
   enc_count=$(find "$ASSETS_OUT/data" "$ASSETS_OUT/modules" "$ASSETS_OUT/mods" "$ASSETS_OUT/layouts" \
     -type f 2>/dev/null -exec sh -c '[ "$(head -c 4 "$1" 2>/dev/null)" = ENC3 ]' _ {} \; -print | wc -l | tr -d ' ')
-  echo "==> Pack encrypted (init.lua ENC3; ${enc_count} files under data/modules/mods/layouts ENC3)"
-  # The client's --encrypt covers data/modules/mods/layouts + init.lua but NOT the
-  # pack-root Tibia.dat/.spr (they sit outside those dirs), so the sprites/dat still
-  # ship readable. Warn loudly — closing this needs the client's encrypt tool to
-  # cover pack-root assets; it cannot be done from packaging.
-  for rel in Tibia.dat Tibia.spr; do
-    f="$ASSETS_OUT/$rel"
-    [ -f "$f" ] || continue
-    if [ "$(head -c 4 "$f" 2>/dev/null)" != "ENC3" ]; then
-      echo "WARNING: $rel is NOT encrypted — pack-root sprites/dat are outside --encrypt scope." >&2
-    fi
-  done
+  echo "==> Pack encrypted (init.lua + Tibia.dat/.spr ENC3; ${enc_count} files under data/modules/mods/layouts ENC3)"
 fi
 
 # Info.plist
