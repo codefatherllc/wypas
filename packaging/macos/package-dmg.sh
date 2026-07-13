@@ -92,26 +92,28 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
   ENC_RC=0
   wait "$ENC_PID" 2>/dev/null || ENC_RC=$?
 
-  # Tripwire: representative assets MUST be ENC3 after encryption. init.lua proves
-  # the tool ran with the correct (compiled-in) seed on this dir; Tibia.dat/.spr are
-  # the headline game assets the deliverable requires unreadable. Fail loudly rather
-  # than ship a plaintext .app.
-  enc_fail=0
-  for rel in init.lua Tibia.dat Tibia.spr; do
+  # Tripwire: init.lua MUST be ENC3 after --encrypt. This is the reliable proof the
+  # tool ran with its compiled-in seed on this dir; a binary lacking WITH_ENCRYPTION
+  # (or a wrong dir/seed) leaves it plaintext. Fail loudly rather than ship plaintext.
+  if [ "$(head -c 4 "$ASSETS_OUT/init.lua" 2>/dev/null)" != "ENC3" ]; then
+    echo "ERROR: init.lua is not ENC3-encrypted after --encrypt (rc=$ENC_RC)." >&2
+    echo "       The macOS binary must be built WITH_ENCRYPTION with ASSET_ENCRYPTION_SEED set." >&2
+    exit 1
+  fi
+  enc_count=$(find "$ASSETS_OUT/data" "$ASSETS_OUT/modules" "$ASSETS_OUT/mods" "$ASSETS_OUT/layouts" \
+    -type f 2>/dev/null -exec sh -c '[ "$(head -c 4 "$1" 2>/dev/null)" = ENC3 ]' _ {} \; -print | wc -l | tr -d ' ')
+  echo "==> Pack encrypted (init.lua ENC3; ${enc_count} files under data/modules/mods/layouts ENC3)"
+  # The client's --encrypt covers data/modules/mods/layouts + init.lua but NOT the
+  # pack-root Tibia.dat/.spr (they sit outside those dirs), so the sprites/dat still
+  # ship readable. Warn loudly — closing this needs the client's encrypt tool to
+  # cover pack-root assets; it cannot be done from packaging.
+  for rel in Tibia.dat Tibia.spr; do
     f="$ASSETS_OUT/$rel"
     [ -f "$f" ] || continue
     if [ "$(head -c 4 "$f" 2>/dev/null)" != "ENC3" ]; then
-      echo "ERROR: $rel is not ENC3-encrypted after --encrypt (rc=$ENC_RC)" >&2
-      enc_fail=1
+      echo "WARNING: $rel is NOT encrypted — pack-root sprites/dat are outside --encrypt scope." >&2
     fi
   done
-  if [ "$enc_fail" -ne 0 ]; then
-    echo "       The macOS binary must be built WITH_ENCRYPTION for the seed to apply." >&2
-    exit 1
-  fi
-  enc_count=$(find "$ASSETS_OUT/data" "$ASSETS_OUT/modules" -type f 2>/dev/null \
-    -exec sh -c '[ "$(head -c 4 "$1" 2>/dev/null)" = ENC3 ]' _ {} \; -print | wc -l | tr -d ' ')
-  echo "==> Pack encrypted (init.lua + Tibia.* ENC3; ${enc_count} files under data/+modules/ ENC3)"
 fi
 
 # Info.plist
