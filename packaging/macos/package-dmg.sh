@@ -25,11 +25,12 @@ mkdir -p "${STAGING_DIR}/${APP_BUNDLE}/Contents/libs"
 cp "$BINARY_PATH" "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
 chmod +x "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
 
-# Bundle the full pack under Contents/MacOS/assets/ — the client's work-dir search
-# checks <exe_dir>/assets/ for init.lua, so the app runs self-contained.
+# Bundle the full pack under Contents/Resources/ — PHYSFS_getBaseDir() resolves to
+# the bundle's Resources dir for a macOS .app, and the client's work-dir search
+# checks baseDir for init.lua, so the app runs self-contained.
 if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
   echo "==> Bundling pack from $PACK_DIR"
-  ASSETS_OUT="${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/assets"
+  ASSETS_OUT="${STAGING_DIR}/${APP_BUNDLE}/Contents/Resources"
   mkdir -p "$ASSETS_OUT"
   # exclude repo/dev cruft; keep init.lua, data, modules, mods, layouts, Tibia.*
   ( cd "$PACK_DIR" && tar --exclude='.git' --exclude='.github' --exclude='.claude' \
