@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: package-dmg.sh <binary_path> <tag> <output_dir> [modules_dir]
+# Usage: package-dmg.sh <binary_path> <tag> <output_dir> [pack_dir]
+#   pack_dir: a full wypas-assets checkout — its init.lua, data/, modules/, mods/,
+#   layouts/ and Tibia.dat/.spr are bundled so the app is self-contained.
 
 BINARY_PATH="$1"
 TAG="$2"
 OUTPUT_DIR="$3"
-MODULES_DIR="${4:-}"
+PACK_DIR="${4:-}"
 
 APP_NAME="Wypas"
 APP_BUNDLE="${APP_NAME}.app"
@@ -23,11 +25,20 @@ mkdir -p "${STAGING_DIR}/${APP_BUNDLE}/Contents/libs"
 cp "$BINARY_PATH" "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
 chmod +x "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
 
-# Bundle updater modules
-if [ -n "$MODULES_DIR" ] && [ -d "$MODULES_DIR" ]; then
-  echo "==> Bundling modules from $MODULES_DIR"
-  mkdir -p "${STAGING_DIR}/${APP_BUNDLE}/Contents/Resources/modules"
-  cp -r "$MODULES_DIR"/* "${STAGING_DIR}/${APP_BUNDLE}/Contents/Resources/modules/"
+# Bundle the full pack under Contents/MacOS/assets/ — the client's work-dir search
+# checks <exe_dir>/assets/ for init.lua, so the app runs self-contained.
+if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
+  echo "==> Bundling pack from $PACK_DIR"
+  ASSETS_OUT="${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/assets"
+  mkdir -p "$ASSETS_OUT"
+  # exclude repo/dev cruft; keep init.lua, data, modules, mods, layouts, Tibia.*
+  ( cd "$PACK_DIR" && tar --exclude='.git' --exclude='.github' --exclude='.claude' \
+      --exclude='*.md' --exclude='LICENSE' --exclude='init.lua.tmpl' \
+      --exclude='.gitattributes' --exclude='.gitignore' -cf - . ) | tar -xf - -C "$ASSETS_OUT"
+  if [ ! -f "$ASSETS_OUT/init.lua" ]; then
+    echo "ERROR: init.lua missing from bundled pack" >&2
+    exit 1
+  fi
 fi
 
 # Info.plist

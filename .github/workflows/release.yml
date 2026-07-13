@@ -140,13 +140,12 @@ jobs:
             --pattern "wypas-macos" \
             --dir binaries/
 
-      - name: Clone updater modules
+      - name: Clone game pack
         run: |
           git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git /tmp/assets
-          mkdir -p modules
-          for mod in $UPDATER_MODULES; do
-            cp -r /tmp/assets/modules/$mod modules/
-          done
+          # ensure LFS blobs (Tibia.spr/.dat) are real files, not pointers
+          git -C /tmp/assets lfs pull
+          test "$(wc -c < /tmp/assets/Tibia.spr)" -gt 1000000 || { echo "Tibia.spr is an LFS pointer, not the blob"; exit 1; }
 
       - name: Install dependencies
         run: |
@@ -160,7 +159,7 @@ jobs:
             binaries/wypas-macos \
             "${{ steps.tag.outputs.value }}" \
             output \
-            modules
+            /tmp/assets
 
       - name: Upload to release
         run: |
