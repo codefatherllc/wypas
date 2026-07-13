@@ -32,7 +32,10 @@ chmod +x "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
 # These MUST render Services.updater non-empty so g_app.hasUpdater() is true and
 # the shipped client self-updates per-file from /api/updater — no re-bundle needed.
 : "${WYPAS_BASE_URL:=https://wypas.eu}"
-: "${WYPAS_DOMAIN:=wypas.eu}"
+# Classic 9.63 login is raw TCP on :7171, which Cloudflare (wypas.eu) does not
+# proxy — dial the game server's direct IP until the HTTP login flow lands.
+# HTTPS services (updater/status/create-account) still use WYPAS_BASE_URL/Cloudflare.
+: "${WYPAS_DOMAIN:=51.178.242.29}"
 : "${WYPAS_PORT:=443}"
 : "${WYPAS_SECURE:=true}"
 
@@ -128,6 +131,11 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
   enc_count=$(find "$ASSETS_OUT/data" "$ASSETS_OUT/modules" "$ASSETS_OUT/mods" "$ASSETS_OUT/layouts" \
     -type f 2>/dev/null -exec sh -c '[ "$(head -c 4 "$1" 2>/dev/null)" = ENC3 ]' _ {} \; -print | wc -l | tr -d ' ')
   echo "==> Pack encrypted (init.lua + Tibia.dat/.spr ENC3; ${enc_count} files under data/modules/mods/layouts ENC3)"
+
+  # The --encrypt tool writes its run log (encryption.log) into the pack dir;
+  # it is a build artifact, not a client asset — drop it so it is neither
+  # bundled in the .app nor listed in the manifest.
+  rm -f "$ASSETS_OUT/encryption.log"
 
   # Seed verification (defense-in-depth at the distribution boundary). The ENC3 adler
   # word (bytes 20-23, LE) is adler32(plaintext) XOR the compiled seed. We know
