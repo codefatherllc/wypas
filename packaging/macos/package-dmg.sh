@@ -136,9 +136,11 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
     echo "       encrypts pack-root Tibia.dat/.spr) with ASSET_ENCRYPTION_SEED set." >&2
     exit 1
   fi
-  enc_count=$(find "$ASSETS_OUT/data" "$ASSETS_OUT/modules" "$ASSETS_OUT/mods" "$ASSETS_OUT/layouts" \
+  # Count ENC3 files under the whole bundle (thin bundles omit mods/layouts/Tibia.*,
+  # so don't name those dirs — a missing path makes find exit non-zero under pipefail).
+  enc_count=$(find "$ASSETS_OUT" \
     -type f 2>/dev/null -exec sh -c '[ "$(head -c 4 "$1" 2>/dev/null)" = ENC3 ]' _ {} \; -print | wc -l | tr -d ' ')
-  echo "==> Pack encrypted (init.lua + Tibia.dat/.spr ENC3; ${enc_count} files under data/modules/mods/layouts ENC3)"
+  echo "==> Pack encrypted (${enc_count} ENC3 files bundled)"
 
   # The --encrypt tool writes its run log (encryption.log) into the pack dir;
   # it is a build artifact, not a client asset — drop it so it is neither
