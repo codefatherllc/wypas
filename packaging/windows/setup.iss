@@ -29,6 +29,13 @@ Name: "{autodesktop}\Wypas"; Filename: "{app}\wypas.exe"
 Filename: "{app}\wypas.exe"; Description: "Launch Wypas"; Flags: nowait postinstall skipifsilent
 
 [Code]
+// Assets are downloaded verbatim from prod, where the deploy pipeline serves them
+// ENC3-encrypted and regenerates manifest.json over the encrypted bytes. This
+// installer stores each file byte-for-byte and does NOT verify checksums (the
+// manifest is parsed only to enumerate filenames), so encrypted assets install
+// fine; the WITH_ENCRYPTION client decrypts them transparently at runtime, and the
+// downloaded init.lua already has the updater enabled. Do not add a plaintext or
+// checksum-verifying step here — it would reject the encrypted files.
 const
   ManifestURL = 'https://wypas.eu/assets/manifest.json';
   AssetsBaseURL = 'https://wypas.eu/assets/';

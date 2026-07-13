@@ -25,6 +25,14 @@ mkdir -p "${STAGING_DIR}/${APP_BUNDLE}/Contents/libs"
 cp "$BINARY_PATH" "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
 chmod +x "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
 
+# Prod endpoints baked into the bundled init.lua (override via env for staging).
+# These MUST render Services.updater non-empty so g_app.hasUpdater() is true and
+# the shipped client self-updates per-file from /api/updater — no re-bundle needed.
+: "${WYPAS_BASE_URL:=https://wypas.eu}"
+: "${WYPAS_DOMAIN:=wypas.eu}"
+: "${WYPAS_PORT:=443}"
+: "${WYPAS_SECURE:=true}"
+
 # Bundle the full pack under Contents/Resources/ — PHYSFS_getBaseDir() resolves to
 # the bundle's Resources dir for a macOS .app, and the client's work-dir search
 # checks baseDir for init.lua, so the app runs self-contained.
@@ -32,14 +40,78 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
   echo "==> Bundling pack from $PACK_DIR"
   ASSETS_OUT="${STAGING_DIR}/${APP_BUNDLE}/Contents/Resources"
   mkdir -p "$ASSETS_OUT"
-  # exclude repo/dev cruft; keep init.lua, data, modules, mods, layouts, Tibia.*
+  # exclude repo/dev cruft and the template; init.lua is rendered below, not copied
   ( cd "$PACK_DIR" && tar --exclude='.git' --exclude='.github' --exclude='.claude' \
-      --exclude='*.md' --exclude='LICENSE' --exclude='init.lua.tmpl' \
+      --exclude='*.md' --exclude='LICENSE' --exclude='init.lua.tmpl' --exclude='init.lua' \
       --exclude='.gitattributes' --exclude='.gitignore' -cf - . ) | tar -xf - -C "$ASSETS_OUT"
-  if [ ! -f "$ASSETS_OUT/init.lua" ]; then
-    echo "ERROR: init.lua missing from bundled pack" >&2
+
+  # Render init.lua from the template with prod values so the auto-updater is ON.
+  # Mirrors wypas-proxy/Makefile's prod render; kept here so the offline .app bundle
+  # gets the same updater-enabled init.lua that prod serves to the Windows client.
+  TMPL="$PACK_DIR/init.lua.tmpl"
+  if [ ! -f "$TMPL" ]; then
+    echo "ERROR: init.lua.tmpl missing from pack ($TMPL)" >&2
     exit 1
   fi
+  sed -e "s|__BASE_URL__|${WYPAS_BASE_URL}|g" \
+      -e "s|__DOMAIN__|${WYPAS_DOMAIN}|g" \
+      -e "s|__PORT__|${WYPAS_PORT}|g" \
+      -e "s|__SECURE__|${WYPAS_SECURE}|g" \
+      "$TMPL" > "$ASSETS_OUT/init.lua"
+  if ! grep -q "${WYPAS_BASE_URL}/api/updater" "$ASSETS_OUT/init.lua"; then
+    echo "ERROR: rendered init.lua does not point Services.updater at prod" >&2
+    exit 1
+  fi
+  echo "==> Rendered init.lua (updater -> ${WYPAS_BASE_URL}/api/updater)"
+
+  # Encrypt the staged pack in place so the .app ships no readable game assets.
+  # The macOS release binary is built WITH_ENCRYPTION and carries the seed, so the
+  # same client decrypts transparently at runtime; exempt files (.otml, ...) are
+  # left plaintext by the tool. Run from a neutral CWD and pass the dir as the arg
+  # (the tool's documented contract) — this is fail-safe: a wrong/old binary that
+  # lacks --encrypt support cannot silently mis-encrypt this dir, it just leaves it
+  # plaintext, which the ENC3 tripwire below catches.
+  WYPAS_BIN="${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
+  echo "==> Encrypting pack in place: $WYPAS_BIN --encrypt $ASSETS_OUT"
+  "$WYPAS_BIN" --encrypt "$ASSETS_OUT" &
+  ENC_PID=$!
+  # Bound the run: a binary lacking WITH_ENCRYPTION falls through --encrypt into
+  # normal startup and would otherwise hang CI (no display). Poll for exit so no
+  # stray background timer lingers holding the job's stdout open.
+  ENC_TIMEOUT="${WYPAS_ENCRYPT_TIMEOUT:-180}"
+  waited=0
+  while kill -0 "$ENC_PID" 2>/dev/null; do
+    if [ "$waited" -ge "$ENC_TIMEOUT" ]; then
+      echo "ERROR: --encrypt exceeded ${ENC_TIMEOUT}s; killing (binary likely lacks WITH_ENCRYPTION)" >&2
+      kill -9 "$ENC_PID" 2>/dev/null || true
+      break
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  ENC_RC=0
+  wait "$ENC_PID" 2>/dev/null || ENC_RC=$?
+
+  # Tripwire: representative assets MUST be ENC3 after encryption. init.lua proves
+  # the tool ran with the correct (compiled-in) seed on this dir; Tibia.dat/.spr are
+  # the headline game assets the deliverable requires unreadable. Fail loudly rather
+  # than ship a plaintext .app.
+  enc_fail=0
+  for rel in init.lua Tibia.dat Tibia.spr; do
+    f="$ASSETS_OUT/$rel"
+    [ -f "$f" ] || continue
+    if [ "$(head -c 4 "$f" 2>/dev/null)" != "ENC3" ]; then
+      echo "ERROR: $rel is not ENC3-encrypted after --encrypt (rc=$ENC_RC)" >&2
+      enc_fail=1
+    fi
+  done
+  if [ "$enc_fail" -ne 0 ]; then
+    echo "       The macOS binary must be built WITH_ENCRYPTION for the seed to apply." >&2
+    exit 1
+  fi
+  enc_count=$(find "$ASSETS_OUT/data" "$ASSETS_OUT/modules" -type f 2>/dev/null \
+    -exec sh -c '[ "$(head -c 4 "$1" 2>/dev/null)" = ENC3 ]' _ {} \; -print | wc -l | tr -d ' ')
+  echo "==> Pack encrypted (init.lua + Tibia.* ENC3; ${enc_count} files under data/+modules/ ENC3)"
 fi
 
 # Info.plist

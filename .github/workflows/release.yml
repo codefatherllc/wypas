@@ -152,7 +152,12 @@ jobs:
           brew install dylibbundler luajit physfs libzip openssl@3 \
             glfw openal-soft libogg libvorbis boost zlib bzip2
 
-      - name: Package DMG
+      # package-dmg.sh renders init.lua from the pack template with prod values
+      # (updater ON), then encrypts the staged Contents/Resources in place using
+      # this same wypas-macos binary as the encrypt tool. That binary MUST be built
+      # WITH_ENCRYPTION (the seed is compiled in) or the script fails the build via
+      # its ENC3 tripwire rather than shipping a plaintext .app.
+      - name: Package DMG (render prod init.lua + encrypt pack)
         run: |
           chmod +x packaging/macos/package-dmg.sh
           ./packaging/macos/package-dmg.sh \
