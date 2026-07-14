@@ -28,35 +28,6 @@ Download from the [Releases](https://github.com/codefatherllc/wypas/releases) pa
 
 The native client updates itself automatically.
 
-## Architecture
-
-```
-                  ┌───────────────────────┐
-                  │       Players         │
-                  │  Browser    Native    │
-                  └─────┬──────────┬─────┘
-                        │          │
-                  ┌─────▼──────────▼─────┐
-                  │    Envoy (HTTPS)      │
-                  └──────────┬───────────┘
-                             │
-          ┌──────────┬───────┼───────┬──────────┐
-          │          │       │       │          │
-     ┌────▼───┐ ┌───▼──┐ ┌──▼──┐ ┌──▼───┐ ┌───▼────┐
-     │  Auth  │ │  API │ │ Web │ │Assets│ │Creator │
-     └────────┘ └──────┘ └─────┘ └──────┘ └───┬────┘
-                                               │
-                                        ┌──────┼──────┐
-                                        │      │      │
-                                   ┌────▼─┐ ┌──▼──┐ ┌─▼──────┐
-                                   │Brain │ │ GPU │ │Database│
-                                   └──────┘ └─────┘ └────────┘
-
-     Game Server (:7172 TCP, :7173 WS) — direct, not proxied
-     Status (:7171 TCP) — direct
-     Brain MCP (:3001 SSE) — direct
-```
-
 ## Components
 
 | Component | Language | Description |
