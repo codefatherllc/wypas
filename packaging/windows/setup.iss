@@ -77,10 +77,10 @@ var
   JSON: AnsiString;
   FilesStr: AnsiString;
   P, BraceDepth, FilesStart: Integer;
-  FileName, DestPath, DirPart, URL: String;
+  FileName, DestPath, DirPart, URL, HashStr: String;
   FileCount, FileIndex, TotalFiles: Integer;
   InKey: Boolean;
-  KeyStart, KeyEnd: Integer;
+  KeyStart, KeyEnd, ValStart: Integer;
 begin
   if not GetManifestJSON(JSON) then
   begin
@@ -151,15 +151,20 @@ begin
           KeyEnd := P;
           FileName := Copy(FilesStr, KeyStart, KeyEnd - KeyStart);
 
-          // Skip the value (the hash string after colon)
+          // Capture the value (CRC32 hash) after the colon, used as a
+          // cache-busting ?v= so Cloudflare can't serve a stale (e.g.
+          // pre-encryption plaintext) copy on the bare URL.
           P := P + 1;
           while (P <= Length(FilesStr)) and (FilesStr[P] <> '"') do
             P := P + 1;
+          HashStr := '';
           if P < Length(FilesStr) then
           begin
             P := P + 1;
+            ValStart := P;
             while (P <= Length(FilesStr)) and (FilesStr[P] <> '"') do
               P := P + 1;
+            HashStr := Copy(FilesStr, ValStart, P - ValStart);
           end;
 
           // Download this file
@@ -168,6 +173,8 @@ begin
           DownloadPage.SetProgress(FileIndex, TotalFiles);
 
           URL := AssetsBaseURL + FileName;
+          if HashStr <> '' then
+            URL := URL + '?v=' + HashStr;
           DestPath := ExpandConstant('{app}') + '\' + FileName;
 
           DirPart := ExtractFileDir(DestPath);
