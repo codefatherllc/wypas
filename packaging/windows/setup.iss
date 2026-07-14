@@ -28,6 +28,12 @@ Name: "{autodesktop}\Wypas"; Filename: "{app}\wypas.exe"
 [Run]
 Filename: "{app}\wypas.exe"; Description: "Launch Wypas"; Flags: nowait postinstall skipifsilent
 
+[UninstallDelete]
+; Assets are downloaded into {app} after install, so Inno's default uninstall
+; (which only removes tracked-installed files) leaves the whole asset tree behind.
+; Remove the entire install folder on uninstall.
+Type: filesandordirs; Name: "{app}"
+
 [Code]
 // Assets are downloaded verbatim from prod, where the deploy pipeline serves them
 // ENC3-encrypted and regenerates manifest.json over the encrypted bytes. This
