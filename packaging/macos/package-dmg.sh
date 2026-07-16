@@ -241,16 +241,28 @@ dylibbundler \
 # Applications symlink for drag-and-drop install
 ln -s /Applications "${STAGING_DIR}/Applications"
 
-# Create DMG
+# Create DMG. hdiutil intermittently fails with "Resource busy" on CI runners
+# (Spotlight/XProtect still scanning the freshly-staged folder) — retry with a
+# delay instead of failing the whole packaging job on a transient.
 echo "==> Creating DMG"
 mkdir -p "$OUTPUT_DIR"
 DMG_PATH="${OUTPUT_DIR}/wypas-setup.dmg"
 
-hdiutil create \
-  -volname "$APP_NAME" \
-  -srcfolder "$STAGING_DIR" \
-  -ov \
-  -format UDZO \
-  "$DMG_PATH"
+for attempt in 1 2 3 4 5; do
+  if hdiutil create \
+    -volname "$APP_NAME" \
+    -srcfolder "$STAGING_DIR" \
+    -ov \
+    -format UDZO \
+    "$DMG_PATH"; then
+    break
+  fi
+  if [ "$attempt" -eq 5 ]; then
+    echo "ERROR: hdiutil create failed after $attempt attempts" >&2
+    exit 1
+  fi
+  echo "==> hdiutil create failed (attempt $attempt) — retrying in 10s"
+  sleep 10
+done
 
 echo "==> Done: ${DMG_PATH}"
