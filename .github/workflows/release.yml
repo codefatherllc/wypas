@@ -12,7 +12,6 @@ on:
 
 env:
   GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-  UPDATER_MODULES: "updater client_locales client_styles client_background"
 
 jobs:
   windows:
@@ -93,22 +92,21 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Clone updater modules
+      - name: Clone game pack
         if: steps.download.outputs.found == 'true'
         run: |
           # Pin to the latest wypas-assets tag — assets main moves independently
           # of client releases and an untagged mid-development pack must not ship.
+          # Sort on a v-prefix-normalized key so "1.0" and "v1.0.1" compare as
+          # versions, not strings.
           ASSETS_TAG=$(git ls-remote --tags --refs \
             https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git \
-            | awk -F/ '{print $NF}' | sort -V | tail -1)
+            | awk -F/ '{t=$NF; n=t; sub(/^v/, "", n); print n" "t}' \
+            | sort -V -k1,1 | tail -1 | cut -d' ' -f2)
           test -n "$ASSETS_TAG" || { echo "ERROR: wypas-assets has no tags"; exit 1; }
           echo "Using wypas-assets tag: $ASSETS_TAG"
           git clone --depth 1 --branch "$ASSETS_TAG" \
             https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git /tmp/assets
-          mkdir -p modules
-          for mod in $UPDATER_MODULES; do
-            cp -r /tmp/assets/modules/$mod modules/
-          done
 
       - name: Install appimagetool
         if: steps.download.outputs.found == 'true'
@@ -118,15 +116,20 @@ jobs:
             "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x /usr/local/bin/appimagetool
 
+      # package.sh mirrors the DMG flow: renders init.lua (updater ON), bundles
+      # the bootstrap set next to the binary, and ENC3-encrypts it in place
+      # using wypas-linux itself — with the same seed tripwire as macOS.
       - name: Package AppImage
         if: steps.download.outputs.found == 'true'
+        env:
+          ASSET_ENCRYPTION_SEED: ${{ secrets.ASSET_ENCRYPTION_SEED }}
         run: |
           chmod +x packaging/linux/package.sh
           ./packaging/linux/package.sh \
             binaries/wypas-linux \
             "${{ steps.tag.outputs.value }}" \
             output \
-            modules
+            /tmp/assets
 
       - name: Upload to release
         if: steps.download.outputs.found == 'true'
@@ -167,9 +170,12 @@ jobs:
         run: |
           # Pin to the latest wypas-assets tag — assets main moves independently
           # of client releases and an untagged mid-development pack must not ship.
+          # Sort on a v-prefix-normalized key so "1.0" and "v1.0.1" compare as
+          # versions, not strings.
           ASSETS_TAG=$(git ls-remote --tags --refs \
             https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git \
-            | awk -F/ '{print $NF}' | sort -V | tail -1)
+            | awk -F/ '{t=$NF; n=t; sub(/^v/, "", n); print n" "t}' \
+            | sort -V -k1,1 | tail -1 | cut -d' ' -f2)
           test -n "$ASSETS_TAG" || { echo "ERROR: wypas-assets has no tags"; exit 1; }
           echo "Using wypas-assets tag: $ASSETS_TAG"
           git clone --depth 1 --branch "$ASSETS_TAG" \
