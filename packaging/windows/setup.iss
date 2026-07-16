@@ -49,6 +49,23 @@ const
 var
   DownloadPage: TOutputProgressWizardPage;
 
+// The installer only bootstraps: init.lua + the updater's module set + data/
+// (fonts, UI resources the updater screen needs). Everything else — game
+// modules, layouts, Tibia.dat/.spr — is synced checksum-verified by the
+// in-game updater on first boot, so installs always run the newest remote
+// pack and never ship a stale or partially-downloaded game tree. Mirrors the
+// thin macOS DMG bundle (see wypas/packaging/macos/package-dmg.sh).
+function IsBootstrapFile(const FileName: String): Boolean;
+begin
+  Result := (FileName = 'init.lua')
+    or (Pos('data/', FileName) = 1)
+    or (Pos('modules/corelib/', FileName) = 1)
+    or (Pos('modules/updater/', FileName) = 1)
+    or (Pos('modules/client_locales/', FileName) = 1)
+    or (Pos('modules/client_styles/', FileName) = 1)
+    or (Pos('modules/client_background/', FileName) = 1);
+end;
+
 function GetManifestJSON(out JSON: AnsiString): Boolean;
 var
   WinHttpReq: Variant;
@@ -68,13 +85,26 @@ begin
 end;
 
 function DownloadFile(const URL, DestPath: String): Boolean;
+var
+  TmpPath: String;
+  Attempt: Integer;
 begin
   Result := False;
-  try
-    DownloadTemporaryFile(URL, ExtractFileName(DestPath), '', nil);
-    FileCopy(ExpandConstant('{tmp}') + '\' + ExtractFileName(DestPath), DestPath, False);
-    Result := True;
-  except
+  TmpPath := ExpandConstant('{tmp}') + '\' + ExtractFileName(DestPath);
+  for Attempt := 1 to 3 do
+  begin
+    try
+      // A stale tmp file left by an earlier download with the same basename
+      // must not mask a failure — FileCopy would install the wrong bytes.
+      DeleteFile(TmpPath);
+      DownloadTemporaryFile(URL, ExtractFileName(DestPath), '', nil);
+      if FileCopy(TmpPath, DestPath, False) then
+      begin
+        Result := True;
+        Exit;
+      end;
+    except
+    end;
   end;
 end;
 
@@ -87,7 +117,9 @@ var
   FileCount, FileIndex, TotalFiles: Integer;
   InKey: Boolean;
   KeyStart, KeyEnd, ValStart: Integer;
+  FailedFiles: Integer;
 begin
+  FailedFiles := 0;
   if not GetManifestJSON(JSON) then
   begin
     MsgBox('Could not download asset manifest. Assets will be downloaded on first launch by the in-game updater.', mbInformation, MB_OK);
@@ -173,22 +205,28 @@ begin
             HashStr := Copy(FilesStr, ValStart, P - ValStart);
           end;
 
-          // Download this file
+          // Download this file (bootstrap set only — see IsBootstrapFile)
           FileIndex := FileIndex + 1;
-          DownloadPage.SetText('Downloading game assets...', FileName);
           DownloadPage.SetProgress(FileIndex, TotalFiles);
+          if IsBootstrapFile(FileName) then
+          begin
+            DownloadPage.SetText('Downloading game assets...', FileName);
 
-          URL := AssetsBaseURL + FileName;
-          if HashStr <> '' then
-            URL := URL + '?v=' + HashStr;
-          DestPath := ExpandConstant('{app}') + '\' + FileName;
+            URL := AssetsBaseURL + FileName;
+            if HashStr <> '' then
+              URL := URL + '?v=' + HashStr;
+            DestPath := ExpandConstant('{app}') + '\' + FileName;
 
-          DirPart := ExtractFileDir(DestPath);
-          if not DirExists(DirPart) then
-            ForceDirectories(DirPart);
+            DirPart := ExtractFileDir(DestPath);
+            if not DirExists(DirPart) then
+              ForceDirectories(DirPart);
 
-          if not DownloadFile(URL, DestPath) then
-            Log('Failed to download: ' + URL);
+            if not DownloadFile(URL, DestPath) then
+            begin
+              Log('Failed to download: ' + URL);
+              FailedFiles := FailedFiles + 1;
+            end;
+          end;
         end;
       end;
       P := P + 1;
@@ -196,6 +234,14 @@ begin
   finally
     DownloadPage.Hide;
   end;
+
+  // A partial bootstrap does not start (module discovery fatals) — say so
+  // loudly instead of leaving a broken install behind.
+  if FailedFiles > 0 then
+    MsgBox(Format('%d game asset files failed to download.' + #13#10 +
+      'The game will not start with an incomplete pack — please check your ' +
+      'connection and run this installer again.', [FailedFiles]),
+      mbError, MB_OK);
 end;
 
 procedure InitializeWizard;

@@ -86,7 +86,15 @@ jobs:
       - name: Clone updater modules
         if: steps.download.outputs.found == 'true'
         run: |
-          git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git /tmp/assets
+          # Pin to the latest wypas-assets tag — assets main moves independently
+          # of client releases and an untagged mid-development pack must not ship.
+          ASSETS_TAG=$(git ls-remote --tags --refs \
+            https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git \
+            | awk -F/ '{print $NF}' | sort -V | tail -1)
+          test -n "$ASSETS_TAG" || { echo "ERROR: wypas-assets has no tags"; exit 1; }
+          echo "Using wypas-assets tag: $ASSETS_TAG"
+          git clone --depth 1 --branch "$ASSETS_TAG" \
+            https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git /tmp/assets
           mkdir -p modules
           for mod in $UPDATER_MODULES; do
             cp -r /tmp/assets/modules/$mod modules/
@@ -142,7 +150,15 @@ jobs:
 
       - name: Clone game pack
         run: |
-          git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git /tmp/assets
+          # Pin to the latest wypas-assets tag — assets main moves independently
+          # of client releases and an untagged mid-development pack must not ship.
+          ASSETS_TAG=$(git ls-remote --tags --refs \
+            https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git \
+            | awk -F/ '{print $NF}' | sort -V | tail -1)
+          test -n "$ASSETS_TAG" || { echo "ERROR: wypas-assets has no tags"; exit 1; }
+          echo "Using wypas-assets tag: $ASSETS_TAG"
+          git clone --depth 1 --branch "$ASSETS_TAG" \
+            https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git /tmp/assets
           # ensure LFS blobs (Tibia.spr/.dat) are real files, not pointers
           git -C /tmp/assets lfs pull
           test "$(wc -c < /tmp/assets/Tibia.spr)" -gt 1000000 || { echo "Tibia.spr is an LFS pointer, not the blob"; exit 1; }
