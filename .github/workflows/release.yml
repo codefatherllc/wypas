@@ -19,6 +19,11 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Don't persist GITHUB_TOKEN as http.extraheader — it overrides the
+          # PAT embedded in the wypas-assets clone/ls-remote URLs below and
+          # 404s the private repo (GITHUB_TOKEN is scoped to this repo only).
+          persist-credentials: false
 
       - name: Resolve tag
         id: tag
@@ -59,6 +64,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Don't persist GITHUB_TOKEN as http.extraheader — it overrides the
+          # PAT embedded in the wypas-assets clone/ls-remote URLs below and
+          # 404s the private repo (GITHUB_TOKEN is scoped to this repo only).
+          persist-credentials: false
 
       - name: Resolve tag
         id: tag
@@ -130,6 +140,11 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Don't persist GITHUB_TOKEN as http.extraheader — it overrides the
+          # PAT embedded in the wypas-assets clone/ls-remote URLs below and
+          # 404s the private repo (GITHUB_TOKEN is scoped to this repo only).
+          persist-credentials: false
 
       - name: Resolve tag
         id: tag
