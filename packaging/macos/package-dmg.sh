@@ -35,7 +35,6 @@ chmod +x "${STAGING_DIR}/${APP_BUNDLE}/Contents/MacOS/wypas"
 # Classic 9.63 login is raw TCP on :7171, which Cloudflare (wypas.eu) does not
 # proxy — dial the game server's direct IP until the HTTP login flow lands.
 # HTTPS services (updater/status/create-account) still use WYPAS_BASE_URL/Cloudflare.
-: "${WYPAS_DOMAIN:=51.178.242.29}"
 : "${WYPAS_PORT:=443}"
 : "${WYPAS_SECURE:=true}"
 
@@ -68,7 +67,6 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
     exit 1
   fi
   sed -e "s|__BASE_URL__|${WYPAS_BASE_URL}|g" \
-      -e "s|__DOMAIN__|${WYPAS_DOMAIN}|g" \
       -e "s|__PORT__|${WYPAS_PORT}|g" \
       -e "s|__SECURE__|${WYPAS_SECURE}|g" \
       "$TMPL" > "$ASSETS_OUT/init.lua"

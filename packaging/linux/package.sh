@@ -33,7 +33,6 @@ chmod +x "${APPDIR}/usr/bin/wypas"
 # Services.updater MUST render non-empty so g_app.hasUpdater() is true and the
 # client syncs the rest of the pack from /api/updater on first boot.
 : "${WYPAS_BASE_URL:=https://wypas.eu}"
-: "${WYPAS_DOMAIN:=51.178.242.29}"
 : "${WYPAS_PORT:=443}"
 : "${WYPAS_SECURE:=true}"
 
@@ -61,7 +60,6 @@ if [ -n "$PACK_DIR" ] && [ -d "$PACK_DIR" ]; then
     exit 1
   fi
   sed -e "s|__BASE_URL__|${WYPAS_BASE_URL}|g" \
-      -e "s|__DOMAIN__|${WYPAS_DOMAIN}|g" \
       -e "s|__PORT__|${WYPAS_PORT}|g" \
       -e "s|__SECURE__|${WYPAS_SECURE}|g" \
       "$TMPL" > "$ASSETS_OUT/init.lua"
