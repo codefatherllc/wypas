@@ -18,6 +18,22 @@ UninstallDisplayIcon={app}\wypas.exe
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 
+[InstallDelete]
+; Clean install: stale pack files from a previous install (or a poisoned
+; updater state) must never shadow the freshly downloaded bootstrap — a
+; leftover init.lua/modules tree boots instead of the new pack and can fatal
+; at module discovery with the updater gated off. User state (config.otml,
+; minimap, bot\, screenshots) is deliberately kept, and so are Tibia.dat/.spr
+; (~150MB): the updater checksum-verifies and replaces them when stale.
+Type: filesandordirs; Name: "{app}\data"
+Type: filesandordirs; Name: "{app}\modules"
+Type: filesandordirs; Name: "{app}\mods"
+Type: filesandordirs; Name: "{app}\layouts"
+Type: files; Name: "{app}\init.lua"
+; stale self-update binaries — the freshly installed wypas.exe is the truth now
+Type: files; Name: "{app}\wypas-*.exe"
+Type: files; Name: "{app}\update.exe"
+
 [Files]
 Source: "..\..\dist\wypas.exe"; DestDir: "{app}"; Flags: ignoreversion
 
