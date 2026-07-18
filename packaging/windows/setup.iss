@@ -155,7 +155,10 @@ begin
       if WinHttpReq.Status = 200 then
       begin
         Stream := CreateOleObject('ADODB.Stream');
-        Stream.Type := 1; // adTypeBinary
+        // 'Type' is a Pascal reserved word, so it can't be set with dot syntax
+        // (Stream.Type := 1 fails to compile); IDispatchInvoke sets it by name.
+        // 1 = adTypeBinary, required so Write/SaveToFile keep the bytes verbatim.
+        IDispatchInvoke(Stream, True, 'Type', [1]);
         Stream.Open;
         Stream.Write(WinHttpReq.ResponseBody);
         Stream.SaveToFile(DestPath, 2); // adSaveCreateOverWrite
