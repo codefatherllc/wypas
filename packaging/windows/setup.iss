@@ -88,6 +88,11 @@ Type: filesandordirs; Name: "{app}"
 const
   ManifestURL = 'https://wypas.eu/assets/manifest.json';
   AssetsBaseURL = 'https://wypas.eu/assets/';
+  // WinHttpRequestOption_SecureProtocols (9) = TLS1.0|TLS1.1|TLS1.2 (128+512+2048).
+  // Stock Windows 7 WinHTTP negotiates only TLS 1.0 by default, but wypas.eu
+  // (Cloudflare) is TLS 1.2-only — without forcing 1.2 every download here is
+  // rejected, the bootstrap never lands, and the client fatals with no pack.
+  SecureProtocolsTLS12 = 2688;
 
 var
   DownloadPage: TOutputProgressWizardPage;
@@ -116,6 +121,7 @@ begin
   Result := False;
   try
     WinHttpReq := CreateOleObject('WinHttp.WinHttpRequest.5.1');
+    WinHttpReq.Option(9) := SecureProtocolsTLS12; // TLS 1.2 — see the const
     WinHttpReq.Open('GET', ManifestURL, False);
     WinHttpReq.Send('');
     if WinHttpReq.Status = 200 then
@@ -127,22 +133,33 @@ begin
   end;
 end;
 
+// Downloads via WinHttpRequest (not Inno's DownloadTemporaryFile) so we can
+// force TLS 1.2 on Windows 7 — the built-in downloader's TLS floor depends on
+// the Inno/OS version and silently fails against the TLS 1.2-only origin.
+// The response body (a byte array) is written verbatim through ADODB.Stream,
+// present on every Windows 7+.
 function DownloadFile(const URL, DestPath: String): Boolean;
 var
-  TmpPath: String;
+  WinHttpReq, Stream: Variant;
   Attempt: Integer;
 begin
   Result := False;
-  TmpPath := ExpandConstant('{tmp}') + '\' + ExtractFileName(DestPath);
   for Attempt := 1 to 3 do
   begin
     try
-      // A stale tmp file left by an earlier download with the same basename
-      // must not mask a failure — FileCopy would install the wrong bytes.
-      DeleteFile(TmpPath);
-      DownloadTemporaryFile(URL, ExtractFileName(DestPath), '', nil);
-      if FileCopy(TmpPath, DestPath, False) then
+      WinHttpReq := CreateOleObject('WinHttp.WinHttpRequest.5.1');
+      WinHttpReq.Option(9) := SecureProtocolsTLS12;
+      WinHttpReq.SetTimeouts(0, 60000, 60000, 120000);
+      WinHttpReq.Open('GET', URL, False);
+      WinHttpReq.Send('');
+      if WinHttpReq.Status = 200 then
       begin
+        Stream := CreateOleObject('ADODB.Stream');
+        Stream.Type := 1; // adTypeBinary
+        Stream.Open;
+        Stream.Write(WinHttpReq.ResponseBody);
+        Stream.SaveToFile(DestPath, 2); // adSaveCreateOverWrite
+        Stream.Close;
         Result := True;
         Exit;
       end;
@@ -163,9 +180,12 @@ var
   FailedFiles: Integer;
 begin
   FailedFiles := 0;
+  // No bundled fallback pack ships on Windows — the bootstrap downloaded here
+  // is the ONLY way the client gets a runnable pack, so a failure must read as
+  // fatal (the in-game updater cannot run without this bootstrap).
   if not GetManifestJSON(JSON) then
   begin
-    MsgBox('Could not download asset manifest. Assets will be downloaded on first launch by the in-game updater.', mbInformation, MB_OK);
+    MsgBox('Could not download game assets. Please check your internet connection and run this installer again.'#13#10#13#10'The game will not start without them.', mbError, MB_OK);
     Exit;
   end;
 
@@ -173,7 +193,7 @@ begin
   P := Pos('"files"', JSON);
   if P = 0 then
   begin
-    MsgBox('Invalid manifest format. Assets will be downloaded on first launch.', mbInformation, MB_OK);
+    MsgBox('The asset manifest was invalid. Please run this installer again.'#13#10#13#10'The game will not start without a complete pack.', mbError, MB_OK);
     Exit;
   end;
 
