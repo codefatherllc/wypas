@@ -55,6 +55,36 @@ jobs:
             --dir dist/
           mv dist/wypas-windows.exe dist/wypas.exe
 
+      - name: Clone game pack
+        shell: bash
+        run: |
+          # Pin to the latest wypas-assets tag — assets main moves independently
+          # of client releases and an untagged mid-development pack must not ship.
+          # Sort on a v-prefix-normalized key so "1.0" and "v1.0.1" compare as
+          # versions, not strings.
+          ASSETS_TAG=$(git ls-remote --tags --refs \
+            https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git \
+            | awk -F/ '{t=$NF; n=t; sub(/^v/, "", n); print n" "t}' \
+            | sort -V -k1,1 | tail -1 | cut -d' ' -f2)
+          test -n "$ASSETS_TAG" || { echo "ERROR: wypas-assets has no tags"; exit 1; }
+          echo "Using wypas-assets tag: $ASSETS_TAG"
+          # Thin bundle: only root Tibia.dat/.spr are LFS and neither ships in
+          # the bootstrap — skip smudge so the clone stays small.
+          GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 --branch "$ASSETS_TAG" \
+            https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git ../assets
+
+      # Same thin-bundle flow as the DMG/AppImage: stage the bootstrap set,
+      # render prod init.lua (updater ON), ENC3-encrypt in place with the
+      # release binary — with the same seed tripwire. Replaces the install-time
+      # download loop (AV behavior blockers killed it as a dropper pattern).
+      - name: Stage + encrypt bootstrap
+        shell: bash
+        env:
+          ASSET_ENCRYPTION_SEED: ${{ secrets.ASSET_ENCRYPTION_SEED }}
+        run: |
+          chmod +x packaging/windows/stage-bootstrap.sh
+          ./packaging/windows/stage-bootstrap.sh dist/wypas.exe ../assets packaging/windows/bootstrap
+
       - name: Build installer with Inno Setup
         shell: cmd
         run: |
