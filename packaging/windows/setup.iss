@@ -1,11 +1,27 @@
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
+; VersionInfoVersion must be numeric-dotted; tags arrive as "v0.3.10"
+#if Copy(AppVersion, 1, 1) == "v"
+  #define NumericAppVersion Copy(AppVersion, 2)
+#else
+  #define NumericAppVersion AppVersion
+#endif
 
 [Setup]
 AppName=Wypas
 AppVersion={#AppVersion}
-AppPublisher=Wypas
+; Real publisher + full version resource: an unsigned installer with a
+; generic publisher and an empty FileVersion is exactly what AV machine-
+; learning heuristics (Defender Wacatac.B!ml) weigh against us. Not a
+; substitute for code signing, but it removes the anonymous-binary signals.
+AppPublisher=The Codefather Sp. z o. o.
+VersionInfoVersion={#NumericAppVersion}
+VersionInfoCompany=The Codefather Sp. z o. o.
+VersionInfoDescription=Wypas Installer
+VersionInfoProductName=Wypas
+VersionInfoProductTextVersion={#AppVersion}
+VersionInfoCopyright=Copyright (C) 2026 The Codefather Sp. z o. o.
 ; v0.3.0 storage split: {app} (%APPDATA%\Wypas) is the PACK dir — exe, game
 ; pack and self-update binaries; wiped wholesale on fresh install/uninstall.
 ; User state (config, minimap, settings, logs) lives in %LOCALAPPDATA%\Wypas
