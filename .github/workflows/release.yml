@@ -239,10 +239,16 @@ jobs:
           git -C /tmp/assets lfs pull
           test "$(wc -c < /tmp/assets/Tibia.spr)" -gt 1000000 || { echo "Tibia.spr is an LFS pointer, not the blob"; exit 1; }
 
+      # freetype/harfbuzz/utf8proc/fribidi arrived with the TTF text stack in
+      # client v0.3.14 and are linked dynamically. They are needed twice over:
+      # the binary cannot start (so --encrypt aborts) without them, and
+      # dylibbundler has to find them to copy them into the .app - otherwise the
+      # shipped bundle is broken on machines without Homebrew.
       - name: Install dependencies
         run: |
           brew install dylibbundler luajit physfs libzip openssl@3 \
-            glfw openal-soft libogg libvorbis boost zlib bzip2
+            glfw openal-soft libogg libvorbis boost zlib bzip2 \
+            freetype harfbuzz utf8proc fribidi
 
       # package-dmg.sh renders init.lua from the pack template with prod values
       # (updater ON), then encrypts the staged Contents/Resources in place using
