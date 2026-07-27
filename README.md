@@ -45,11 +45,11 @@ The native client updates itself automatically.
 
 ## Deployment
 
-Hybrid Docker + native architecture. Go services run in Docker (linux/arm64+amd64). Server, brain, and graphics run natively on macOS for Metal GPU access. Orchestrated by [wypas-proxy](https://github.com/codefatherllc/wypas-proxy).
+Hybrid Docker + native architecture. Go services run in Docker (linux/arm64+amd64). Server, brain, and graphics run natively on macOS for Metal GPU access. Orchestrated by [wypas-proxy](https://github.com/codefatherllc/wypas-infra).
 
 ```bash
 # Local dev (Docker + Make + Git)
-git clone git@github.com:codefatherllc/wypas-proxy.git && cd wypas-proxy
+git clone git@github.com:codefatherllc/wypas-infra.git && cd wypas-proxy
 make login && make dev
 
 # Production
