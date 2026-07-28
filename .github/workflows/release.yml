@@ -62,11 +62,15 @@ jobs:
           # of client releases and an untagged mid-development pack must not ship.
           # Sort on a v-prefix-normalized key so "1.0" and "v1.0.1" compare as
           # versions, not strings.
-          ASSETS_TAG=$(git ls-remote --tags --refs \
+          # dispatched assets_tag wins (assets-release payload) — re-resolving
+          # "newest" here raced a second tag landing mid-run; the fallback stays
+          # for client-release/manual runs
+          ASSETS_TAG='${{ github.event.client_payload.assets_tag }}'
+          [ -n "$ASSETS_TAG" ] || ASSETS_TAG=$(git ls-remote --tags --refs \
             https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git \
             | awk -F/ '{t=$NF; n=t; sub(/^v/, "", n); print n" "t}' \
             | sort -V -k1,1 | tail -1 | cut -d' ' -f2)
-          test -n "$ASSETS_TAG" || { echo "ERROR: wypas-assets has no tags"; exit 1; }
+          test -n "$ASSETS_TAG" || { echo "ERROR: no assets tag (payload or ls-remote)"; exit 1; }
           echo "Using wypas-assets tag: $ASSETS_TAG"
           # Thin bundle: only root Tibia.dat/.spr are LFS and neither ships in
           # the bootstrap — skip smudge so the clone stays small.
@@ -147,11 +151,15 @@ jobs:
           # of client releases and an untagged mid-development pack must not ship.
           # Sort on a v-prefix-normalized key so "1.0" and "v1.0.1" compare as
           # versions, not strings.
-          ASSETS_TAG=$(git ls-remote --tags --refs \
+          # dispatched assets_tag wins (assets-release payload) — re-resolving
+          # "newest" here raced a second tag landing mid-run; the fallback stays
+          # for client-release/manual runs
+          ASSETS_TAG='${{ github.event.client_payload.assets_tag }}'
+          [ -n "$ASSETS_TAG" ] || ASSETS_TAG=$(git ls-remote --tags --refs \
             https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git \
             | awk -F/ '{t=$NF; n=t; sub(/^v/, "", n); print n" "t}' \
             | sort -V -k1,1 | tail -1 | cut -d' ' -f2)
-          test -n "$ASSETS_TAG" || { echo "ERROR: wypas-assets has no tags"; exit 1; }
+          test -n "$ASSETS_TAG" || { echo "ERROR: no assets tag (payload or ls-remote)"; exit 1; }
           echo "Using wypas-assets tag: $ASSETS_TAG"
           git clone --depth 1 --branch "$ASSETS_TAG" \
             https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git /tmp/assets
@@ -227,11 +235,15 @@ jobs:
           # of client releases and an untagged mid-development pack must not ship.
           # Sort on a v-prefix-normalized key so "1.0" and "v1.0.1" compare as
           # versions, not strings.
-          ASSETS_TAG=$(git ls-remote --tags --refs \
+          # dispatched assets_tag wins (assets-release payload) — re-resolving
+          # "newest" here raced a second tag landing mid-run; the fallback stays
+          # for client-release/manual runs
+          ASSETS_TAG='${{ github.event.client_payload.assets_tag }}'
+          [ -n "$ASSETS_TAG" ] || ASSETS_TAG=$(git ls-remote --tags --refs \
             https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git \
             | awk -F/ '{t=$NF; n=t; sub(/^v/, "", n); print n" "t}' \
             | sort -V -k1,1 | tail -1 | cut -d' ' -f2)
-          test -n "$ASSETS_TAG" || { echo "ERROR: wypas-assets has no tags"; exit 1; }
+          test -n "$ASSETS_TAG" || { echo "ERROR: no assets tag (payload or ls-remote)"; exit 1; }
           echo "Using wypas-assets tag: $ASSETS_TAG"
           git clone --depth 1 --branch "$ASSETS_TAG" \
             https://x-access-token:${GH_TOKEN}@github.com/codefatherllc/wypas-assets.git /tmp/assets
