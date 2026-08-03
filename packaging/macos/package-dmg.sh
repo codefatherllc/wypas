@@ -203,6 +203,26 @@ cat > "${STAGING_DIR}/${APP_BUNDLE}/Contents/Info.plist" <<PLIST
     <string>AppIcon</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <!-- Claims "wypas://cam/<id>" so a cam link on the website opens the client.
+         This declaration is what makes the app reachable at all: LaunchServices
+         reads it when the bundle is registered, then delivers the URL as an
+         Apple Event (the client installs the handler in
+         src/framework/platform/macurlscheme.mm). macOS passes it NOWHERE in
+         argv, so the raw wypas-macos binary — which has no bundle and therefore
+         no way to claim a scheme — cannot receive cam links at all. -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.wypas.client.camlink</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>wypas</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
 PLIST
