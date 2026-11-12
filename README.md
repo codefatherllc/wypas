@@ -34,6 +34,7 @@ The native client updates itself automatically.
 |-----------|----------|-------------|
 | **Game Server** | C++ 17 | Real-time world simulation — creatures, combat, quests, economy |
 | **Game Client** | C++ / WASM | Native desktop (macOS, Windows) + browser via WebAssembly |
+| **UI Editor** | Lua / C++ | Native visual editor for the Wypas OTUI dialect |
 | **Auth** | Go | Account management, login, JWT tokens |
 | **API** | Go | REST endpoints + WebSocket hub (online count, live activity) |
 | **Web App** | Vue 3 / TS | Frontend SPA — accounts, highscores, community, map editor |
@@ -68,6 +69,31 @@ make prod  # Docker services + native processes + launchd
 | AI / ML | PyTorch (training) → ONNX Runtime (inference) |
 | Database | MariaDB |
 | Deployment | Docker + Envoy + native (macOS) |
+
+## UI development
+
+With the sibling `wypas-framework`, `wypas-assets`, and `wypas-ui-editor`
+checkouts present, launch the dedicated native Content Studio with:
+
+```bash
+./scripts/ui-editor
+```
+
+It previews through the independently compiled framework renderer and can write
+only Wypas `.otui` sources in the active plaintext development pack.
+
+With the editor running, inspect the real assembled widget tree—including
+Lua-loaded dependencies—from another terminal:
+
+```bash
+./scripts/wypas-ui open /modules/game_market/market.otui
+./scripts/wypas-ui tree attached --properties
+./scripts/wypas-ui inspect '#categoryComboBox'
+./scripts/wypas-ui screenshot
+```
+
+Run `./scripts/wypas-ui --help` for live attachment, selection, JSON output,
+self-tests, and trusted local Lua execution.
 
 ## License
 

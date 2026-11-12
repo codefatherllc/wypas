@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+umbrella_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+editor_runner="${umbrella_root}/../wypas-ui-editor/scripts/run"
+
+if [[ ! -x "${editor_runner}" ]]; then
+  printf 'wypas: UI editor runner is missing at %s\n' "${editor_runner}" >&2
+  exit 1
+fi
+
+exec "${editor_runner}" "$@"
