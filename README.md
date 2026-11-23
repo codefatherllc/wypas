@@ -57,6 +57,9 @@ make login && make dev
 make prod  # Docker services + native processes + launchd
 ```
 
+For native C++ development with Nix, enter the pinned compiler shell from this
+repository with `nix develop .#cpp`.
+
 ## Tech Stack
 
 | Layer | Technology |
